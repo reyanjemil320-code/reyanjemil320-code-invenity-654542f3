@@ -1,0 +1,29 @@
+name: Deploy Supabase Edge Functions
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'supabase/functions/**'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Pull down your latest code from the repository
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      # 2. Set up the Supabase CLI environment
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      # 3. Deploy the brainstorm-chat function using your GitHub repository secrets
+      - name: Deploy Edge Function
+        run: supabase functions deploy brainstorm-chat --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}

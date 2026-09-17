@@ -1,0 +1,29 @@
+name: Deploy Supabase Edge Functions
+
+on:
+  push:
+    branches:
+      - main  # Change this to 'master' if your main branch is named master
+    paths:
+      - 'supabase/functions/**' # Only runs when you actually edit your backend code
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Pull down your latest code
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      # 2. Install the Supabase CLI on GitHub's temporary machine
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      # 3. Deploy the brainstorm-chat function automatically
+      - name: Deploy Edge Function
+        run: supabase functions deploy brainstorm-chat --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
