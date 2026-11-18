@@ -1,10 +1,9 @@
 import { createContext, useContext, useEffect, useState } from "react";
-import { Session, User } from "@supabase/supabase-js";
-import { supabase } from "@/integrations/supabase/client";
+import { fetchAuth, getToken, clearToken, type AuthUser } from "@/lib/api";
 
 interface AuthContextValue {
-  user: User | null;
-  session: Session | null;
+  user: AuthUser | null;
+  session: AuthUser | null; // kept for page compatibility: truthy when signed in
   loading: boolean;
   isAdmin: boolean;
   signOut: () => Promise<void>;
@@ -13,56 +12,41 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
-    // Set listener FIRST, then fetch session (per Supabase guidance)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, sess) => {
-      setSession(sess);
-      setUser(sess?.user ?? null);
-      if (sess?.user) {
-        // Defer role check to avoid deadlock
-        setTimeout(async () => {
-          const { data } = await supabase
-            .from("user_roles" as any)
-            .select("role")
-            .eq("user_id", sess.user.id)
-            .eq("role", "admin")
-            .maybeSingle();
-          setIsAdmin(!!data);
-        }, 0);
-      } else {
-        setIsAdmin(false);
-      }
-    });
-
-    supabase.auth.getSession().then(({ data: { session: sess } }) => {
-      setSession(sess);
-      setUser(sess?.user ?? null);
+    const token = getToken();
+    if (!token) {
       setLoading(false);
-      if (sess?.user) {
-        supabase
-          .from("user_roles" as any)
-          .select("role")
-          .eq("user_id", sess.user.id)
-          .eq("role", "admin")
-          .maybeSingle()
-          .then(({ data }) => setIsAdmin(!!data));
-      }
-    });
-
-    return () => subscription.unsubscribe();
+      return;
+    }
+    fetchAuth<{ user: AuthUser }>("/api/auth/me")
+      .then((res) => {
+        setUser(res.user);
+        setIsAdmin(!!res.user.isAdmin);
+        setLoading(false);
+      })
+      .catch(() => {
+        clearToken();
+        setLoading(false);
+      });
   }, []);
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    try {
+      await fetchAuth("/api/auth/logout", { method: "POST" });
+    } catch {
+      /* clear locally regardless */
+    }
+    clearToken();
+    setUser(null);
+    setIsAdmin(false);
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, isAdmin, signOut }}>
+    <AuthContext.Provider value={{ user, session: user, loading, isAdmin, signOut }}>
       {children}
     </AuthContext.Provider>
   );

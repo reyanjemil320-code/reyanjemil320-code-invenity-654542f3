@@ -6,7 +6,7 @@ import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
-import { supabase } from "@/integrations/supabase/client";
+import { fetchJson, type SiteStats } from "@/lib/api";
 import logo from "@/assets/invenity-logo.png";
 
 const features = [
@@ -43,12 +43,12 @@ export default function Index() {
 
   useEffect(() => {
     const loadStats = async () => {
-      const [p, i, f] = await Promise.all([
-        supabase.from("profiles").select("id", { count: "exact", head: true }),
-        supabase.from("inventions").select("id", { count: "exact", head: true }),
-        supabase.from("follows").select("follower_id", { count: "exact", head: true }),
-      ]);
-      setStats({ inventors: p.count ?? 0, ideas: i.count ?? 0, collabs: f.count ?? 0 });
+      try {
+        const s = await fetchJson<SiteStats>("/api/stats");
+        setStats({ inventors: s.inventors, ideas: s.ideas, collabs: s.collabs });
+      } catch {
+        setStats({ inventors: 0, ideas: 0, collabs: 0 });
+      }
     };
     void loadStats();
   }, []);

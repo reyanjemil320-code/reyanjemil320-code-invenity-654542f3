@@ -7,12 +7,12 @@ import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { supabase } from "@/integrations/supabase/client";
+import { fetchJson, setToken } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { z } from "zod";
 import { Logo } from "@/components/Logo";
-import { Loader2, Mail, ArrowLeft, User as UserIcon, Building2, AlertCircle, CheckCircle2, Eye, EyeOff } from "lucide-react";
+import { Loader2, Mail, ArrowLeft, User as UserIcon, Building2, AlertCircle, Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const NAME_REGEX = /^[a-zA-Z\u00C0-\u024F][a-zA-Z\u00C0-\u024F\s'\-\.]{0,59}$/;
@@ -52,7 +52,6 @@ export default function Auth() {
   const { user } = useAuth();
   const [tab, setTab] = useState<"signin" | "signup" | "forgot">("signin");
   const [loading, setLoading] = useState(false);
-  const [verificationSent, setVerificationSent] = useState(false);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -104,28 +103,26 @@ export default function Auth() {
     }
     setErrors({});
     setLoading(true);
-    const { error } = await supabase.auth.signUp({
-      email: parsed.data.email,
-      password: parsed.data.password,
-      options: {
-        emailRedirectTo: `${window.location.origin}/`,
-        data: {
-          display_name: parsed.data.displayName,
-          account_type: parsed.data.accountType,
-          company_name: parsed.data.companyName || null,
-        },
-      },
-    });
-    setLoading(false);
-    if (error) {
-      const msg = error.message.includes("already registered")
-        ? "This email is already registered. Try signing in instead."
-        : error.message;
-      setFormError(msg);
-      return;
+    try {
+      const res = await fetchJson<{ token: string }>("/api/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: parsed.data.email,
+          password: parsed.data.password,
+          displayName: parsed.data.displayName,
+          accountType: parsed.data.accountType,
+          companyName: parsed.data.companyName || "",
+        }),
+      });
+      setToken(res.token);
+      toast.success("Welcome to Invenity!");
+      navigate("/");
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
+    } finally {
+      setLoading(false);
     }
-    setVerificationSent(true);
-    toast.success("Check your email to verify your account.");
   };
 
   const handleSignIn = async (e: React.FormEvent) => {
@@ -138,38 +135,26 @@ export default function Auth() {
     }
     setErrors({});
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({
-      email: parsed.data.email,
-      password: parsed.data.password,
-    });
-    setLoading(false);
-    if (error) {
-      const msg = error.message.includes("Email not confirmed")
-        ? "Please verify your email before signing in."
-        : "Incorrect email or password. Please try again.";
-      setFormError(msg);
-      return;
+    try {
+      const res = await fetchJson<{ token: string }>("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: parsed.data.email, password: parsed.data.password }),
+      });
+      setToken(res.token);
+      toast.success("Welcome back!");
+      navigate("/");
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
+    } finally {
+      setLoading(false);
     }
-    toast.success("Welcome back!");
-    navigate("/");
   };
 
   const handleForgot = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
-    const parsed = z.string().email("Enter a valid email").safeParse(email);
-    if (!parsed.success) {
-      setErrors({ email: parsed.error.errors[0].message });
-      return;
-    }
-    setErrors({});
-    setLoading(true);
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
-    });
-    setLoading(false);
-    if (error) setFormError(error.message);
-    else toast.success("Password reset email sent.");
+    toast.info("Password reset by email is coming soon — accounts work without it for now.");
   };
 
   const errorClass = "border-destructive focus-visible:ring-destructive/40";
@@ -179,29 +164,6 @@ export default function Auth() {
         <AlertCircle className="h-3.5 w-3.5" /> {errors[name]}
       </p>
     ) : null;
-
-  if (verificationSent) {
-    return (
-      <div className="min-h-screen bg-gradient-hero flex items-center justify-center p-4">
-        <Card className="max-w-md w-full p-8 text-center elegant-shadow animate-scale-in">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-success/10">
-            <CheckCircle2 className="h-9 w-9 text-success" />
-          </div>
-          <h1 className="text-2xl font-bold mb-2">Check your email</h1>
-          <p className="text-muted-foreground mb-4">
-            We sent a verification link to <span className="font-medium text-foreground">{email}</span>. Click it to activate your account.
-          </p>
-          <div className="mb-6 rounded-lg border border-border/60 bg-muted/40 p-3 text-left text-xs text-muted-foreground">
-            <p className="font-semibold text-foreground mb-1">Heads up</p>
-            <p>The email is sent by <span className="font-medium">Supabase Auth</span> (the service powering Invenity logins). Look for the sender <span className="font-mono">noreply@mail.app.supabase.io</span>. If you don't see it in a minute, check your spam or promotions folder.</p>
-          </div>
-          <Button variant="outline" onClick={() => { setVerificationSent(false); setTab("signin"); }} className="w-full">
-            Back to sign in
-          </Button>
-        </Card>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gradient-hero flex items-center justify-center p-4 relative overflow-hidden">
@@ -359,9 +321,6 @@ export default function Auth() {
                 {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Create account
               </Button>
-              <p className="text-xs text-center text-muted-foreground">
-                You'll receive an email to verify your account.
-              </p>
             </form>
           </TabsContent>
         </Tabs>
