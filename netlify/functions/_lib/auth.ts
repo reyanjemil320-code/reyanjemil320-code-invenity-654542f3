@@ -1,4 +1,4 @@
-import { randomBytes, scryptSync, timingSafeEqual, createHash } from "node:crypto";
+import { randomBytes, scryptSync, timingSafeEqual, createHash } from "crypto";
 import type { Client } from "@libsql/client/web";
 
 const SESSION_DAYS = 30;

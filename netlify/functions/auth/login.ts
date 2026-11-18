@@ -1,5 +1,5 @@
-import { getDb } from "./_lib/db";
-import { verifyPassword, createSession } from "./_lib/auth";
+import { getDb } from "../_lib/db";
+import { verifyPassword, createSession } from "../_lib/auth";
 
 export default async (req: Request) => {
   if (req.method !== "POST") {

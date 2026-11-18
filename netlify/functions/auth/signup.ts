@@ -1,5 +1,5 @@
-import { getDb } from "./_lib/db";
-import { hashPassword, createSession } from "./_lib/auth";
+import { getDb } from "../_lib/db";
+import { hashPassword, createSession } from "../_lib/auth";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 

@@ -1,5 +1,5 @@
-import { getDb } from "./_lib/db";
-import { getSessionUser } from "./_lib/auth";
+import { getDb } from "../_lib/db";
+import { getSessionUser } from "../_lib/auth";
 
 export default async (req: Request) => {
   try {
