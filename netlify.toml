@@ -20,3 +20,5 @@
   from = "/*"
   to = "/index.html"
   status = 200
+
+# marker: clean deploy after making repo public (auth routes live)
