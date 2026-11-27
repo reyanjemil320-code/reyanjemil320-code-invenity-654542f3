@@ -4,43 +4,55 @@ import { Github, Twitter, Mail } from "lucide-react";
 
 export function Footer() {
   return (
-    <footer className="border-t border-border/40 bg-background mt-auto">
+    <footer className="relative mt-auto border-t border-accent/15 bg-background">
+      <div className="divider-gold" />
       <div className="mx-auto max-w-7xl px-4 py-12 md:px-6">
         <div className="grid gap-10 md:grid-cols-4">
           <div>
             <Logo />
-            <p className="mt-4 text-sm text-muted-foreground max-w-xs">
+            <p className="mt-4 max-w-xs text-sm text-muted-foreground">
               The home for inventors. Share ideas, find collaborators, and bring breakthroughs to life.
             </p>
-            <p className="mt-3 text-xs text-muted-foreground italic">Invent. Connect. Inspire.</p>
+            <p className="mt-3 text-xs italic gold-text">Invent. Connect. Inspire.</p>
           </div>
           <div>
-            <h4 className="mb-3 text-sm font-semibold">Platform</h4>
-            <ul className="space-y-2 text-sm text-muted-foreground">
-              <li><Link to="/browse" className="hover:text-primary transition-smooth">Browse Inventions</Link></li>
-              <li><Link to="/network" className="hover:text-primary transition-smooth">The Network</Link></li>
-              <li><Link to="/spark-arena" className="hover:text-primary transition-smooth">Spark Arena</Link></li>
-              <li><Link to="/ai-brainstorm" className="hover:text-primary transition-smooth">AI Brainstorm</Link></li>
+            <h4 className="mb-3 text-sm font-semibold uppercase tracking-wider">Platform</h4>
+            <ul className="space-y-2.5 text-sm text-muted-foreground">
+              <li><Link to="/browse" className="link-gold hover:text-accent">Browse Inventions</Link></li>
+              <li><Link to="/network" className="link-gold hover:text-accent">The Network</Link></li>
+              <li><Link to="/spark-arena" className="link-gold hover:text-accent">Spark Arena</Link></li>
+              <li><Link to="/ai-brainstorm" className="link-gold hover:text-accent">AI Brainstorm</Link></li>
             </ul>
           </div>
           <div>
-            <h4 className="mb-3 text-sm font-semibold">Get started</h4>
-            <ul className="space-y-2 text-sm text-muted-foreground">
-              <li><Link to="/auth" className="hover:text-primary transition-smooth">Create account</Link></li>
-              <li><Link to="/post" className="hover:text-primary transition-smooth">Post an idea</Link></li>
+            <h4 className="mb-3 text-sm font-semibold uppercase tracking-wider">Get started</h4>
+            <ul className="space-y-2.5 text-sm text-muted-foreground">
+              <li><Link to="/auth" className="link-gold hover:text-accent">Create account</Link></li>
+              <li><Link to="/post" className="link-gold hover:text-accent">Post an idea</Link></li>
             </ul>
           </div>
           <div>
-            <h4 className="mb-3 text-sm font-semibold">Connect</h4>
+            <h4 className="mb-3 text-sm font-semibold uppercase tracking-wider">Connect</h4>
             <div className="flex gap-3">
-              <a href="#" aria-label="Twitter" className="text-muted-foreground hover:text-primary transition-smooth"><Twitter className="h-5 w-5" /></a>
-              <a href="#" aria-label="GitHub" className="text-muted-foreground hover:text-primary transition-smooth"><Github className="h-5 w-5" /></a>
-              <a href="#" aria-label="Email" className="text-muted-foreground hover:text-primary transition-smooth"><Mail className="h-5 w-5" /></a>
+              {[
+                { icon: Twitter, label: "Twitter" },
+                { icon: Github, label: "GitHub" },
+                { icon: Mail, label: "Email" },
+              ].map(({ icon: Icon, label }) => (
+                <a
+                  key={label}
+                  href="#"
+                  aria-label={label}
+                  className="rounded-full border border-border/60 p-2.5 text-muted-foreground transition-smooth hover:border-accent/60 hover:text-accent hover:glow-gold"
+                >
+                  <Icon className="h-4 w-4" />
+                </a>
+              ))}
             </div>
           </div>
         </div>
         <div className="mt-10 border-t border-border/40 pt-6 text-center text-xs text-muted-foreground">
-          © {new Date().getFullYear()} Invenity. All rights reserved.
+          © {new Date().getFullYear()} <span className="font-semibold gold-text">Invenity</span>. All rights reserved.
         </div>
       </div>
     </footer>
