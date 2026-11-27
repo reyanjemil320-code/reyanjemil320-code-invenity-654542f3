@@ -14,13 +14,14 @@ import {
   Loader2,
   X,
   Image as ImageIcon,
-  Video,
   Sparkles,
   AlertCircle,
   CheckCircle2,
+  Link as LinkIcon,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
+import { fetchAuth } from "@/lib/api";
+import { compressImage } from "@/lib/media";
 import { toast } from "sonner";
 import { z } from "zod";
 import { cn } from "@/lib/utils";
@@ -66,12 +67,12 @@ const schema = z.object({
   industrial_application: z.string().trim().max(200, "Too long").optional().or(z.literal("")),
   patent_status: z.string().trim().max(120).optional().or(z.literal("")),
   current_milestone: z.string().trim().max(200).optional().or(z.literal("")),
+  video_url: z.string().trim().url("Must be a valid link (https://…)").optional().or(z.literal("")),
 });
 
 type FieldErrors = Record<string, string>;
 
-const MAX_IMAGE_BYTES = 8 * 1024 * 1024; // 8MB
-const MAX_VIDEO_BYTES = 50 * 1024 * 1024; // 50MB
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024; // 8MB source file (compressed before upload)
 
 export default function PostInvention() {
   const { user } = useAuth();
@@ -79,7 +80,6 @@ export default function PostInvention() {
   const [submitting, setSubmitting] = useState(false);
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [galleryFiles, setGalleryFiles] = useState<File[]>([]);
-  const [videoFile, setVideoFile] = useState<File | null>(null);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -94,6 +94,7 @@ export default function PostInvention() {
     industrial_application: "",
     patent_status: "",
     current_milestone: "",
+    video_url: "",
   });
 
   const update = (k: keyof typeof form, v: string) => {
@@ -105,12 +106,12 @@ export default function PostInvention() {
     return (
       <div className="flex min-h-screen flex-col bg-background">
         <Navbar />
-        <main className="flex-1 flex items-center justify-center p-4 bg-gradient-mesh">
-          <Card className="p-10 text-center max-w-md elegant-shadow animate-scale-in">
-            <Sparkles className="mx-auto mb-3 h-10 w-10 text-primary animate-invenity-pulse" />
-            <h2 className="text-2xl font-bold mb-2">Sign in to post</h2>
-            <p className="text-muted-foreground mb-6">Create an account to share your invention.</p>
-            <Button onClick={() => navigate("/auth")} className="bg-gradient-primary">
+        <main className="bg-gradient-mesh flex flex-1 items-center justify-center p-4">
+          <Card className="glass-strong elegant-shadow animate-scale-in max-w-md p-10 text-center">
+            <Sparkles className="text-accent animate-invenity-pulse mx-auto mb-3 h-10 w-10" />
+            <h2 className="mb-2 text-2xl font-bold">Sign in to post</h2>
+            <p className="mb-6 text-muted-foreground">Create an account to share your invention.</p>
+            <Button onClick={() => navigate("/auth")} className="btn-shine rounded-full bg-gradient-primary">
               Sign In
             </Button>
           </Card>
@@ -120,29 +121,10 @@ export default function PostInvention() {
     );
   }
 
-  const uploadFile = async (file: File, bucket: string): Promise<string | null> => {
-    const ext = file.name.split(".").pop();
-    const path = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-    const { error } = await supabase.storage.from(bucket).upload(path, file);
-    if (error) {
-      toast.error(`Upload failed: ${error.message}`);
-      return null;
-    }
-    const { data } = supabase.storage.from(bucket).getPublicUrl(path);
-    return data.publicUrl;
-  };
-
   const validateImage = (file: File | null, label: string) => {
     if (!file) return null;
     if (!file.type.startsWith("image/")) return `${label} must be an image file`;
     if (file.size > MAX_IMAGE_BYTES) return `${label} must be under 8MB`;
-    return null;
-  };
-
-  const validateVideo = (file: File | null) => {
-    if (!file) return null;
-    if (!file.type.startsWith("video/")) return "Demo video must be a video file";
-    if (file.size > MAX_VIDEO_BYTES) return "Demo video must be under 50MB";
     return null;
   };
 
@@ -170,8 +152,6 @@ export default function PostInvention() {
       const e = validateImage(f, `Gallery photo "${f.name}"`);
       if (e) fileErrors.push(e);
     });
-    const vid = validateVideo(videoFile);
-    if (vid) fileErrors.push(vid);
 
     if (fileErrors.length) {
       setFormError(fileErrors[0]);
@@ -180,46 +160,50 @@ export default function PostInvention() {
 
     setErrors({});
     setSubmitting(true);
-    let cover_image_url: string | null = null;
-    let video_url: string | null = null;
-    const gallery_urls: string[] = [];
 
-    if (coverFile) cover_image_url = await uploadFile(coverFile, "invention-media");
-    if (videoFile) video_url = await uploadFile(videoFile, "invention-media");
-    for (const f of galleryFiles) {
-      const url = await uploadFile(f, "invention-media");
-      if (url) gallery_urls.push(url);
-    }
+    try {
+      // Compress images to small data URLs (stored with the invention row)
+      const cover = coverFile ? await compressImage(coverFile) : null;
+      const gallery: string[] = [];
+      for (const f of galleryFiles.slice(0, 6)) {
+        const compressed = await compressImage(f, { maxDimension: 900, maxBytes: 120_000 });
+        gallery.push(compressed.dataUrl);
+      }
 
-    const { error } = await supabase.from("inventions").insert({
-      user_id: user.id,
-      title: parsed.data.title,
-      description: parsed.data.description,
-      category: parsed.data.category as any,
-      status: parsed.data.status as any,
-      location: parsed.data.location || null,
-      technical_details: parsed.data.technical_details || null,
-      use_case: parsed.data.use_case || null,
-      industrial_application: parsed.data.industrial_application || null,
-      patent_status: parsed.data.patent_status || null,
-      current_milestone: parsed.data.current_milestone || null,
-      cover_image_url,
-      video_url,
-      gallery_urls,
-    } as any);
-    setSubmitting(false);
-    if (error) {
-      setFormError(error.message);
-      return;
+      await fetchAuth("/api/inventions-create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: parsed.data.title,
+          description: parsed.data.description,
+          category: parsed.data.category,
+          status: parsed.data.status,
+          location: parsed.data.location || "",
+          technical_details: parsed.data.technical_details || "",
+          use_case: parsed.data.use_case || "",
+          industrial_application: parsed.data.industrial_application || "",
+          patent_status: parsed.data.patent_status || "",
+          current_milestone: parsed.data.current_milestone || "",
+          video_url: parsed.data.video_url || "",
+          cover_image_url: cover?.dataUrl ?? null,
+          gallery_urls: gallery,
+        }),
+      });
+
+      toast.success("Invention posted!");
+      navigate("/browse");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Could not publish your invention. Please try again.";
+      setFormError(msg);
+    } finally {
+      setSubmitting(false);
     }
-    toast.success("Invention posted!");
-    navigate("/browse");
   };
 
   const errClass = "border-destructive focus-visible:ring-destructive/40";
   const FieldError = ({ name }: { name: string }) =>
     errors[name] ? (
-      <p className="mt-1.5 flex items-center gap-1 text-xs font-medium text-destructive animate-fade-in">
+      <p className="animate-fade-in mt-1.5 flex items-center gap-1 text-xs font-medium text-destructive">
         <AlertCircle className="h-3.5 w-3.5" /> {errors[name]}
       </p>
     ) : null;
@@ -230,22 +214,22 @@ export default function PostInvention() {
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <Navbar />
-      <main className="flex-1 px-4 py-10 md:px-6 md:py-16 relative">
-        <div className="pointer-events-none absolute inset-0 bg-gradient-mesh opacity-60" />
-        <div className="mx-auto max-w-3xl relative">
-          <div className="mb-8 animate-fade-in">
-            <h1 className="text-3xl font-bold md:text-4xl mb-2 gradient-text">Post an Invention</h1>
+      <main className="relative flex-1 px-4 py-10 md:px-6 md:py-16">
+        <div className="bg-gradient-mesh pointer-events-none absolute inset-0 opacity-60" />
+        <div className="relative mx-auto max-w-3xl">
+          <div className="animate-rise mb-8">
+            <h1 className="gradient-text mb-2 text-3xl font-bold md:text-4xl">Post an Invention</h1>
             <p className="text-muted-foreground">Share your idea with the Invenity community.</p>
           </div>
 
           {formError && (
-            <Alert variant="destructive" className="mb-6 animate-shake border-destructive/40 bg-destructive/10">
+            <Alert variant="destructive" className="animate-shake mb-6 border-destructive/40 bg-destructive/10">
               <AlertCircle className="h-4 w-4" />
-              <AlertDescription className="text-destructive font-medium">{formError}</AlertDescription>
+              <AlertDescription className="font-medium text-destructive">{formError}</AlertDescription>
             </Alert>
           )}
 
-          <Card className="p-6 md:p-8 elegant-shadow animate-slide-up glass">
+          <Card className="glass-strong animate-slide-up elegant-shadow p-6 md:p-8">
             <form onSubmit={handleSubmit} className="space-y-6">
               <div>
                 <div className="flex items-center justify-between">
@@ -263,7 +247,7 @@ export default function PostInvention() {
                 />
                 <FieldError name="title" />
                 {!errors.title && (
-                  <p className="text-xs text-muted-foreground mt-1">
+                  <p className="mt-1 text-xs text-muted-foreground">
                     {form.title.length}/120 — must contain letters
                   </p>
                 )}
@@ -286,7 +270,7 @@ export default function PostInvention() {
                 />
                 <FieldError name="description" />
                 {!errors.description && (
-                  <p className="text-xs text-muted-foreground mt-1">
+                  <p className="mt-1 text-xs text-muted-foreground">
                     {form.description.length}/3000 — minimum 30 characters
                   </p>
                 )}
@@ -341,8 +325,8 @@ export default function PostInvention() {
               {/* Cover image */}
               <div>
                 <Label>Cover Image</Label>
-                <label className="mt-1 flex items-center gap-3 rounded-xl border border-dashed border-border bg-secondary/30 px-4 py-3 cursor-pointer hover:border-primary hover:bg-primary/5 transition-smooth">
-                  <Upload className="h-4 w-4 text-primary" />
+                <label className="mt-1 flex cursor-pointer items-center gap-3 rounded-xl border border-dashed border-accent/40 bg-secondary/30 px-4 py-3 transition-smooth hover:border-accent hover:bg-accent/5">
+                  <Upload className="h-4 w-4 text-accent" />
                   <span className="text-sm text-muted-foreground">{coverFile ? coverFile.name : "Upload cover image (max 8MB)"}</span>
                   <input
                     type="file"
@@ -366,19 +350,19 @@ export default function PostInvention() {
                 <Label>Gallery Photos</Label>
                 <div className="mt-1 flex flex-wrap gap-2">
                   {galleryFiles.map((f, i) => (
-                    <div key={i} className="relative h-20 w-20 rounded-lg bg-secondary flex items-center justify-center animate-scale-in">
+                    <div key={i} className="animate-scale-in relative flex h-20 w-20 items-center justify-center rounded-lg border border-border/60 bg-secondary">
                       <ImageIcon className="h-6 w-6 text-muted-foreground" />
                       <button
                         type="button"
                         onClick={() => setGalleryFiles(galleryFiles.filter((_, j) => j !== i))}
-                        className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground rounded-full p-0.5 hover:scale-110 transition-smooth"
+                        className="transition-smooth absolute -right-1 -top-1 rounded-full bg-destructive p-0.5 text-destructive-foreground hover:scale-110"
                       >
                         <X className="h-3 w-3" />
                       </button>
                     </div>
                   ))}
-                  <label className="h-20 w-20 rounded-lg border border-dashed border-border bg-secondary/30 flex items-center justify-center cursor-pointer hover:border-primary hover:bg-primary/5 transition-smooth">
-                    <Upload className="h-5 w-5 text-primary" />
+                  <label className="flex h-20 w-20 cursor-pointer items-center justify-center rounded-lg border border-dashed border-accent/40 bg-secondary/30 transition-smooth hover:border-accent hover:bg-accent/5">
+                    <Upload className="h-5 w-5 text-accent" />
                     <input
                       type="file"
                       accept="image/*"
@@ -392,34 +376,27 @@ export default function PostInvention() {
                           if (err) toast.error(err);
                           else valid.push(f);
                         }
-                        setGalleryFiles([...galleryFiles, ...valid]);
+                        setGalleryFiles([...galleryFiles, ...valid].slice(0, 6));
                       }}
                     />
                   </label>
                 </div>
               </div>
 
-              {/* Video */}
               <div>
-                <Label>Demo Video</Label>
-                <label className="mt-1 flex items-center gap-3 rounded-xl border border-dashed border-border bg-secondary/30 px-4 py-3 cursor-pointer hover:border-primary hover:bg-primary/5 transition-smooth">
-                  <Video className="h-4 w-4 text-primary" />
-                  <span className="text-sm text-muted-foreground">{videoFile ? videoFile.name : "Upload demo video (max 50MB)"}</span>
-                  <input
-                    type="file"
-                    accept="video/*"
-                    className="hidden"
-                    onChange={(e) => {
-                      const f = e.target.files?.[0] || null;
-                      const err = validateVideo(f);
-                      if (err) {
-                        toast.error(err);
-                        return;
-                      }
-                      setVideoFile(f);
-                    }}
+                <Label htmlFor="video">Demo Video Link</Label>
+                <div className="relative">
+                  <LinkIcon className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    id="video"
+                    value={form.video_url}
+                    onChange={(e) => update("video_url", e.target.value)}
+                    placeholder="https://youtube.com/watch?v=… or a direct video link"
+                    className={cn("pl-10", errors.video_url && errClass)}
                   />
-                </label>
+                </div>
+                <FieldError name="video_url" />
+                <p className="mt-1 text-xs text-muted-foreground">Paste a link to your demo video (YouTube, Drive, etc.).</p>
               </div>
 
               <div>
@@ -486,7 +463,12 @@ export default function PostInvention() {
                 </div>
               </div>
 
-              <Button type="submit" className="w-full bg-gradient-primary hover:opacity-90" size="lg" disabled={submitting}>
+              <Button
+                type="submit"
+                size="lg"
+                disabled={submitting}
+                className="btn-shine glow-shadow w-full rounded-full bg-gradient-primary py-6 text-base font-bold hover:opacity-90"
+              >
                 {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Publish invention
               </Button>
