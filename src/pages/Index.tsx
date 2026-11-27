@@ -7,6 +7,7 @@ import { Link } from "react-router-dom";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { fetchJson, type SiteStats } from "@/lib/api";
+import { useAuth } from "@/hooks/useAuth";
 import logo from "@/assets/invenity-logo.png";
 
 const features = [
@@ -39,6 +40,7 @@ const steps = [
 ];
 
 export default function Index() {
+  const { user } = useAuth();
   const [stats, setStats] = useState({ inventors: 0, ideas: 0, collabs: 0 });
 
   useEffect(() => {
@@ -82,9 +84,15 @@ export default function Index() {
               </p>
               <div className="mt-10 flex flex-wrap gap-4">
                 <Button asChild size="lg" className="rounded-full text-base font-semibold gap-2 glow-shadow">
-                  <Link to="/auth">
-                    Join Invenity <ArrowRight className="h-4 w-4" />
-                  </Link>
+                  {user ? (
+                    <Link to="/post">
+                      Post Your Idea <ArrowRight className="h-4 w-4" />
+                    </Link>
+                  ) : (
+                    <Link to="/auth">
+                      Join Invenity <ArrowRight className="h-4 w-4" />
+                    </Link>
+                  )}
                 </Button>
                 <Button asChild variant="outline" size="lg" className="rounded-full text-base font-semibold gap-2">
                   <Link to="/browse">

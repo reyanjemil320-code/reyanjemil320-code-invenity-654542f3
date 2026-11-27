@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { fetchJson, setToken } from "@/lib/api";
+import { fetchJson, setToken, type AuthUser } from "@/lib/api";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -49,7 +49,7 @@ type FieldErrors = Record<string, string>;
 
 export default function Auth() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, signIn } = useAuth();
   const [tab, setTab] = useState<"signin" | "signup" | "forgot">("signin");
   const [loading, setLoading] = useState(false);
 
@@ -104,7 +104,7 @@ export default function Auth() {
     setErrors({});
     setLoading(true);
     try {
-      const res = await fetchJson<{ token: string }>("/api/auth/signup", {
+      const res = await fetchJson<{ token: string; user: AuthUser }>("/api/auth/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -116,6 +116,7 @@ export default function Auth() {
         }),
       });
       setToken(res.token);
+      signIn(res.user);
       toast.success("Welcome to Invenity!");
       navigate("/");
     } catch (err) {
@@ -136,12 +137,13 @@ export default function Auth() {
     setErrors({});
     setLoading(true);
     try {
-      const res = await fetchJson<{ token: string }>("/api/auth/login", {
+      const res = await fetchJson<{ token: string; user: AuthUser }>("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: parsed.data.email, password: parsed.data.password }),
       });
       setToken(res.token);
+      signIn(res.user);
       toast.success("Welcome back!");
       navigate("/");
     } catch (err) {
