@@ -6,9 +6,27 @@
 [functions]
   node_bundler = "esbuild"
 
+# Auth functions are flattened to top-level files (auth-signup.ts, etc.)
+# because Netlify's function packer only deploys top-level function files
+# and silently skips files in subdirectories like auth/.
 [[redirects]]
-  from = "/api/auth/*"
-  to = "/.netlify/functions/auth/:splat"
+  from = "/api/auth/signup"
+  to = "/.netlify/functions/auth-signup"
+  status = 200
+
+[[redirects]]
+  from = "/api/auth/login"
+  to = "/.netlify/functions/auth-login"
+  status = 200
+
+[[redirects]]
+  from = "/api/auth/logout"
+  to = "/.netlify/functions/auth-logout"
+  status = 200
+
+[[redirects]]
+  from = "/api/auth/me"
+  to = "/.netlify/functions/auth-me"
   status = 200
 
 [[redirects]]
@@ -20,5 +38,3 @@
   from = "/*"
   to = "/index.html"
   status = 200
-
-# marker: clean deploy after making repo public (auth routes live)
