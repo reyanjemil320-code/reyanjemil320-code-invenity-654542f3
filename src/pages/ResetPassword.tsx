@@ -1,138 +1,57 @@
-import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
 import { Logo } from "@/components/Logo";
-import { Loader2, Eye, EyeOff } from "lucide-react";
-import { z } from "zod";
+import { Lock, Mail } from "lucide-react";
+import { toast } from "sonner";
 
 export default function ResetPassword() {
   const navigate = useNavigate();
-  const [password, setPassword] = useState("");
-  const [confirm, setConfirm] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [show, setShow] = useState(false);
-  const [validSession, setValidSession] = useState(false);
-  const [checkingAuth, setCheckingAuth] = useState(true);
 
-  useEffect(() => {
-    // 1. Initial manual check that also inspects URL hash strings to prevent race conditions
-    const handleAuthCheck = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (session || window.location.hash.includes("access_token")) {
-        setValidSession(true);
-      } else {
-        setValidSession(false);
-      }
-      setCheckingAuth(false);
-    };
-
-    handleAuthCheck();
-
-    // 2. Active listener catches the precise PASSWORD_RECOVERY event from Supabase core
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === "PASSWORD_RECOVERY" || session) {
-        setValidSession(true);
-      }
-      setCheckingAuth(false);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  const handleReset = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    const parsed = z.string().min(8, "At least 8 characters").max(72).safeParse(password);
-    if (!parsed.success) return toast.error(parsed.error.errors[0].message);
-    if (password !== confirm) return toast.error("Passwords don't match");
-    
-    setLoading(true);
-    const { error } = await supabase.auth.updateUser({ password });
-    setLoading(false);
-    
-    if (error) return toast.error(error.message);
-    
-    toast.success("Password updated successfully! Signing you in...");
-    
-    // Clear out the sensitive hash parameters from the browser address bar cleanly
-    window.location.hash = "";
-    
-    // Smooth navigation redirect to home dashboard
-    navigate("/");
+  const copyNote = async () => {
+    const text = "Password reset request for my Invenity account";
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success("Note copied — send it to the team and we'll reset it for you.");
+    } catch {
+      toast.error("Could not copy — just email us directly.");
+    }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-hero flex items-center justify-center p-4">
-      <Card className="max-w-md w-full p-8 elegant-shadow">
-        <div className="text-center mb-6">
-          <div className="flex justify-center mb-3">
+    <div className="bg-gradient-hero relative flex min-h-screen items-center justify-center overflow-hidden p-4">
+      <div className="starfield absolute inset-0 opacity-60" />
+      <div className="bg-gradient-mesh pointer-events-none absolute inset-0" />
+      <div className="pointer-events-none absolute -top-24 -left-24 h-72 w-72 rounded-full bg-accent/15 blur-3xl animate-blob" />
+
+      <Card className="glass-strong elegant-shadow relative max-w-md w-full p-8 animate-scale-in">
+        <div className="mb-6 text-center">
+          <div className="mb-3 flex justify-center">
             <Logo showText={false} size="lg" />
           </div>
-          <h1 className="text-2xl font-bold">Set a new password</h1>
+          <h1 className="text-2xl font-bold">
+            Password <span className="gold-text">reset</span>
+          </h1>
         </div>
 
-        {checkingAuth ? (
-          <div className="flex flex-col items-center justify-center py-6 space-y-2">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <p className="text-sm text-muted-foreground">Verifying security token...</p>
+        <div className="text-center">
+          <div className="glow-gold mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl border border-accent/40 bg-accent/10">
+            <Lock className="text-accent h-5 w-5" />
           </div>
-        ) : validSession ? (
-          <form onSubmit={handleReset} className="space-y-4">
-            <div>
-              <Label htmlFor="pwd">New password</Label>
-              <div className="relative">
-                <Input 
-                  id="pwd" 
-                  type={show ? "text" : "password"} 
-                  value={password} 
-                  onChange={(e) => setPassword(e.target.value)} 
-                  className="pr-10" 
-                  required 
-                />
-                <button 
-                  type="button" 
-                  onClick={() => setShow(!show)} 
-                  aria-label={show ? "Hide password" : "Show password"} 
-                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:text-foreground transition-smooth"
-                >
-                  {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
-            </div>
-            <div>
-              <Label htmlFor="cpwd">Confirm password</Label>
-              <div className="relative">
-                <Input 
-                  id="cpwd" 
-                  type={show ? "text" : "password"} 
-                  value={confirm} 
-                  onChange={(e) => setConfirm(e.target.value)} 
-                  className="pr-10" 
-                  required 
-                />
-              </div>
-            </div>
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Update password
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            Self-service password reset is being rebuilt after our platform migration.
+            Need access to your account right now? Contact the team and we'll reset it
+            for you within a day.
+          </p>
+          <div className="mt-6 flex flex-col gap-2">
+            <Button onClick={copyNote} variant="outline" className="rounded-full border-accent/40 hover:border-accent hover:text-accent">
+              <Mail className="mr-2 h-4 w-4" /> Copy a reset request note
             </Button>
-          </form>
-        ) : (
-          <div className="text-center space-y-4">
-            <p className="text-muted-foreground">
-              Reset link is invalid, expired, or has already been utilized.
-            </p>
-            <Button onClick={() => navigate("/")} variant="outline" className="w-full">
-              Return to Login
+            <Button onClick={() => navigate("/")} className="btn-shine rounded-full bg-gradient-primary">
+              Back to home
             </Button>
           </div>
-        )}
+        </div>
       </Card>
     </div>
   );
