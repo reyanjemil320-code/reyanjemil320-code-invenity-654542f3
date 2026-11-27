@@ -6,6 +6,7 @@ interface AuthContextValue {
   session: AuthUser | null; // kept for page compatibility: truthy when signed in
   loading: boolean;
   isAdmin: boolean;
+  signIn: (user: AuthUser) => void;
   signOut: () => Promise<void>;
 }
 
@@ -34,6 +35,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
   }, []);
 
+  // Called by the Auth page right after a successful signup/login, so the
+  // whole app (navbar etc.) switches to the signed-in UI without a reload.
+  const signIn = (u: AuthUser) => {
+    setUser(u);
+    setIsAdmin(!!u.isAdmin);
+  };
+
   const signOut = async () => {
     try {
       await fetchAuth("/api/auth/logout", { method: "POST" });
@@ -46,7 +54,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session: user, loading, isAdmin, signOut }}>
+    <AuthContext.Provider value={{ user, session: user, loading, isAdmin, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   );

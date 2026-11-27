@@ -12,7 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 const navLinks = [
   { label: "Home", path: "/" },
@@ -71,9 +71,8 @@ export function Navbar() {
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="rounded-full">
                     <Avatar className="h-8 w-8">
-                      <AvatarImage src={user.user_metadata?.avatar_url} />
                       <AvatarFallback className="bg-primary/10 text-primary text-xs">
-                        {user.email?.[0].toUpperCase()}
+                        {(user.displayName || user.email || "?").charAt(0).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
                   </Button>
