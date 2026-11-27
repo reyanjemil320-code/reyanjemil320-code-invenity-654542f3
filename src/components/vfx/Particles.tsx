@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { useCanvas, rgba } from "./useCanvas";
 
 interface ParticlesProps {
@@ -22,8 +23,17 @@ export default function Particles({
   alphaParticles = false,
   className = "",
 }: ParticlesProps) {
+  // Track the current pointer listener so a resize (which re-runs setup)
+  // removes the previous one instead of stacking listeners forever.
+  const pointerCleanup = useRef<(() => void) | null>(null);
+  useEffect(() => () => pointerCleanup.current?.(), []);
+
   const ref = useCanvas(
     (w, h) => {
+      pointerCleanup.current?.();
+      const controller = new AbortController();
+      pointerCleanup.current = () => controller.abort();
+
       const n = Math.min(particleCount, 260);
       const parts = Array.from({ length: n }, () => ({
         x: Math.random() * w,
@@ -38,7 +48,7 @@ export default function Particles({
         mouse.x = e.clientX;
         mouse.y = e.clientY;
       };
-      if (moveParticlesOnHover) window.addEventListener("pointermove", onMove);
+      if (moveParticlesOnHover) window.addEventListener("pointermove", onMove, { signal: controller.signal });
 
       return (ctx, t) => {
         ctx.clearRect(0, 0, w, h);
